@@ -240,11 +240,11 @@ func (loader *Loader) explodePackageRequires(pkgVar *Var) bf.Formula {
 
 	var uniqueRequirements []bf.Formula
 	for _, satisfies := range requirements {
-		uniqueVars := []string{}
+		uniqueVars := []bf.Formula{}
 		for _, s := range satisfies {
-			uniqueVars = append(uniqueVars, s.satVarName)
+			uniqueVars = append(uniqueVars, bf.Var(s.satVarName))
 		}
-		uniqueRequirements = append(uniqueRequirements, bf.Unique(uniqueVars...))
+		uniqueRequirements = append(uniqueRequirements, bf.Or(uniqueVars...))
 	}
 
 	if uniqueRequirements == nil {
