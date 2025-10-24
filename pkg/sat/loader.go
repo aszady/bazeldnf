@@ -28,16 +28,18 @@ type Loader struct {
 // (repo priority, version criteria).
 type BestKey struct {
 	name string
+	arch string
 }
 
 func CompareBestKey(k1 BestKey, k2 BestKey) int {
 	return cmp.Or(
 		cmp.Compare(k1.name, k2.name),
+		cmp.Compare(k1.arch, k2.arch),
 	)
 }
 
 func MakeBestKey(pkg *api.Package) BestKey {
-	return BestKey{name: pkg.Name}
+	return BestKey{name: pkg.Name, arch: pkg.Arch}
 }
 
 func NewLoader() *Loader {
