@@ -67,7 +67,7 @@ bazeldnf_toolchain = module_extension(
 _ALIAS_TEMPLATE = """\
 alias(
     name = "{name}",
-    actual = "@{actual_name}//rpm",
+    actual = "{actual}",
     visibility = ["//visibility:public"],
 )
 """
@@ -122,19 +122,22 @@ def _alias_repository_impl(repository_ctx):
             architectures = repr(repository_ctx.attr.architectures),
         ),
     )
-    for rpm in repository_ctx.attr.rpms:
-        actual_name = rpm.repo_name
-        name = rpm.repo_name
 
-        if repository_ctx.attr.repository_prefix:
-            name = actual_name.split(repository_ctx.attr.repository_prefix, 1)[-1]
+    packages = {}
+    for name, target in repository_ctx.attr.rpms.items():
+        pkg, name = name.split(':')
+        packages.setdefault(pkg, {})[name] = target
 
+    for package, aliases in packages.items():
         repository_ctx.file(
-            "%s/BUILD.bazel" % name,
-            _ALIAS_TEMPLATE.format(
-                name = name,
-                actual_name = actual_name,
-            ),
+            "%s/BUILD.bazel" % package,
+            "\n".join([
+                _ALIAS_TEMPLATE.format(
+                    name = name,
+                    actual = actual,
+                )
+                for name, actual in aliases.items()
+            ])
         )
 
     if not repository_ctx.attr.rpms:
@@ -149,7 +152,7 @@ def _alias_repository_impl(repository_ctx):
 _alias_repository = repository_rule(
     implementation = _alias_repository_impl,
     attrs = {
-        "rpms": attr.label_list(default = []),
+        "rpms": attr.string_dict(),
         "lock_file": attr.label(),
         "rpms_to_install": attr.string_list(),
         "excludes": attr.string_list(),
@@ -194,12 +197,18 @@ def _handle_lock_file(config, module_ctx, registered_rpms = {}):
     # List of repositories & aliases we want to have created, even if they didn't resolve to existing RPMs
     ensure_rpm_repository = {}
 
+    # Map of aliases from <package>:<target> to <actual target>
+    # to create in `_alias_repository`
+    aliases = {}
+
     if module_ctx.path(config.lock_file).exists:
         content = module_ctx.read(config.lock_file)
         lock_file_json = json.decode(content)
 
         for rpm in lock_file_json.get("rpms", []):
-            _add_rpm_repository(config, rpm, lock_file_json, registered_rpms)
+            repo_info = _add_rpm_repository(config, rpm, lock_file_json, registered_rpms)
+            if repo_info:
+                aliases.setdefault(repo_info.rpm_name, {})[repo_info.rpm_name] = "@{}//rpm".format(repo_info.repo_name)
 
         # if there's targets without matching RPMs we need to create a null target
         # so that consumers have something consistent that they can depend on
@@ -210,9 +219,17 @@ def _handle_lock_file(config, module_ctx, registered_rpms = {}):
             ensure_rpm_repository[target] = True
 
     for target in ensure_rpm_repository:
-        _add_null_rpm_repository(config, target, registered_rpms)
+        if target not in aliases.get(target, {}):
+            repo_info = _add_null_rpm_repository(config, target, registered_rpms)
+            if repo_info:
+                aliases.setdefault(repo_info.rpm_name, {})[repo_info.rpm_name] = "@{}//rpm".format(repo_info.repo_name)
 
-    repository_args["rpms"] = ["@@%s//rpm" % x for x in registered_rpms.keys()]
+    # Encode aliases data in a form that could be passed with one of the `attr`-allowed types:
+    rpms = {}
+    for pkg, map in aliases.items():
+        for name, target in map.items():
+            rpms[pkg + ":" + name] = target
+    repository_args["rpms"] = rpms
 
     _alias_repository(
         **repository_args
@@ -251,7 +268,10 @@ def _add_rpm_repository(config, rpm, lock_file_json, registered_rpms):
         urls = urls,
         **rpm
     )
-    return True
+    return struct(
+        rpm_name = rpm_name,
+        repo_name = name,
+    )
 
 def _add_null_rpm_repository(config, target, registered_rpms):
     name = _to_rpm_repo_name(config.rpm_repository_prefix, target)
@@ -260,7 +280,10 @@ def _add_null_rpm_repository(config, target, registered_rpms):
 
     null_rpm_repository(name = name)
     registered_rpms[name] = 1
-    return True
+    return struct(
+        rpm_name = target,
+        repo_name = name,
+    )
 
 def _bazeldnf_extension(module_ctx):
     # make sure all our dependencies are registered as those may be needed when those
