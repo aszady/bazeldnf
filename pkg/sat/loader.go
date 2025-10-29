@@ -314,6 +314,9 @@ func (loader *Loader) explodeSamePackageConflicts(pkgVar *Var) bf.Formula {
 		if otherPkgVar.Package == pkgVar.Package { // itself
 			continue
 		}
+		if otherPkgVar.Package.Arch != pkgVar.Package.Arch {
+			continue
+		}
 		conflictingVars = append(conflictingVars, bf.Var(otherPkgVar.satVarName))
 	}
 	if len(conflictingVars) == 0 {
