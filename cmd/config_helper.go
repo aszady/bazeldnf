@@ -42,6 +42,7 @@ func toConfig(install, forceIgnored []*api.Package, targets []string, cmdline []
 
 		allPackages[installPackage.Name] = &bazeldnf.RPM{
 			Name:         installPackage.Name,
+			Arch:         installPackage.Arch,
 			Integrity:    integrity,
 			URLs:         []string{installPackage.Location.Href},
 			Repository:   installPackage.Repository.Name,
