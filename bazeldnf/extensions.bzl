@@ -208,7 +208,13 @@ def _handle_lock_file(config, module_ctx, registered_rpms = {}):
         for rpm in lock_file_json.get("rpms", []):
             repo_info = _add_rpm_repository(config, rpm, lock_file_json, registered_rpms)
             if repo_info:
-                aliases.setdefault(repo_info.rpm_name, {})[repo_info.rpm_name] = "@{}//rpm".format(repo_info.repo_name)
+                target_name = repo_info.rpm_name
+                if repo_info.arch:
+                    target_name += "." + repo_info.arch
+                aliases.setdefault(repo_info.rpm_name, {})[target_name] = "@{}//rpm".format(repo_info.repo_name)
+                if target_name != repo_info.rpm_name:
+                    if repo_info.arch in (repository_args['architectures'][0], 'noarch'):
+                        aliases.setdefault(repo_info.rpm_name, {})[repo_info.rpm_name] = ":" + target_name
 
         # if there's targets without matching RPMs we need to create a null target
         # so that consumers have something consistent that they can depend on
@@ -246,7 +252,7 @@ def _add_rpm_repository(config, rpm, lock_file_json, registered_rpms):
         dependencies = ["@{}{}//rpm".format(config.rpm_repository_prefix, x) for x in dependencies]
 
     rpm_name = rpm.pop("name", None)
-    _rpm_arch = rpm.pop("arch", None)  # unused for now
+    arch = rpm.pop("arch", None)
     if not rpm_name:
         urls = rpm.get("urls", [])
         if len(urls) < 1:
@@ -271,6 +277,7 @@ def _add_rpm_repository(config, rpm, lock_file_json, registered_rpms):
     )
     return struct(
         rpm_name = rpm_name,
+        arch = arch,
         repo_name = name,
     )
 
@@ -283,6 +290,7 @@ def _add_null_rpm_repository(config, target, registered_rpms):
     registered_rpms[name] = 1
     return struct(
         rpm_name = target,
+        arch = None,
         repo_name = name,
     )
 
