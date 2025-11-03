@@ -11,6 +11,12 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+type Id string
+
+func makeId(pkg *api.Package) Id {
+	return Id(pkg.Name)
+}
+
 func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
 	keys := maps.Keys(m)
 	slices.Sort(keys)
@@ -18,12 +24,14 @@ func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
 }
 
 func toConfig(install, forceIgnored []*api.Package, targets []string, cmdline []string) (*bazeldnf.Config, error) {
-	ignored := make(map[string]bool)
+	ignored := make(map[Id]bool)
+	ignoredNames := make(map[string]bool)
 	for _, forceIgnoredPackage := range forceIgnored {
-		ignored[forceIgnoredPackage.Name] = true
+		ignored[makeId(forceIgnoredPackage)] = true
+		ignoredNames[forceIgnoredPackage.Name] = true
 	}
 
-	allPackages := make(map[string]*bazeldnf.RPM)
+	allPackages := make(map[Id]*bazeldnf.RPM)
 	repositories := make(map[string][]string)
 	for _, installPackage := range install {
 		repositories[installPackage.Repository.Name] = installPackage.Repository.Mirrors
@@ -40,7 +48,7 @@ func toConfig(install, forceIgnored []*api.Package, targets []string, cmdline []
 			return nil, fmt.Errorf("Unable to read package %s integrity: %w", installPackage.Name, err)
 		}
 
-		allPackages[installPackage.Name] = &bazeldnf.RPM{
+		allPackages[makeId(installPackage)] = &bazeldnf.RPM{
 			Name:         installPackage.Name,
 			Integrity:    integrity,
 			URLs:         []string{installPackage.Location.Href},
@@ -59,14 +67,17 @@ func toConfig(install, forceIgnored []*api.Package, targets []string, cmdline []
 			return nil, err
 		}
 
-		pkg.SetDependencies(deps)
+		pkg.Dependencies = make([]string, len(deps))
+		for i, dep := range deps {
+			pkg.Dependencies[i] = string(dep)
+		}
 
 		sortedPackages = append(sortedPackages, pkg)
 	}
 
 	lockFile := bazeldnf.Config{
 		CommandLineArguments: cmdline,
-		ForceIgnored:         sortedKeys(ignored),
+		ForceIgnored:         sortedKeys(ignoredNames),
 		RPMs:                 sortedPackages,
 		Repositories:         repositories,
 		Targets:              targets,
@@ -75,16 +86,16 @@ func toConfig(install, forceIgnored []*api.Package, targets []string, cmdline []
 	return &lockFile, nil
 }
 
-func collectProviders(pkgSets ...[]*api.Package) map[string]string {
-	providers := map[string]string{}
+func collectProviders(pkgSets ...[]*api.Package) map[string]Id {
+	providers := map[string]Id{}
 	for _, pkgSet := range pkgSets {
 		for _, pkg := range pkgSet {
 			for _, entry := range pkg.Format.Provides.Entries {
-				providers[entry.Name] = pkg.Name
+				providers[entry.Name] = makeId(pkg)
 			}
 
 			for _, entry := range pkg.Format.Files {
-				providers[entry.Text] = pkg.Name
+				providers[entry.Text] = makeId(pkg)
 			}
 		}
 	}
@@ -92,8 +103,8 @@ func collectProviders(pkgSets ...[]*api.Package) map[string]string {
 	return providers
 }
 
-func collectDependencies(pkg string, requires []string, providers map[string]string, ignored map[string]bool) ([]string, error) {
-	depSet := make(map[string]bool)
+func collectDependencies(pkg Id, requires []string, providers map[string]Id, ignored map[Id]bool) ([]Id, error) {
+	depSet := make(map[Id]bool)
 	for _, req := range requires {
 		logrus.Debugf("Resolving dependency %s", req)
 		provider, ok := providers[req]
@@ -110,11 +121,11 @@ func collectDependencies(pkg string, requires []string, providers map[string]str
 
 	deps := sortedKeys(depSet)
 
-	found := map[string]bool{pkg: true}
+	found := map[Id]bool{pkg: true}
 
 	// RPMs may have circular dependencies, even depend on themselves.
 	// we need to ignore such dependencies
-	nonCyclicDeps := make([]string, 0, len(deps))
+	nonCyclicDeps := make([]Id, 0, len(deps))
 	for _, dep := range deps {
 		if found[dep] {
 			continue
