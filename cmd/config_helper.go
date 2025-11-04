@@ -14,7 +14,11 @@ import (
 type Id string
 
 func makeId(pkg *api.Package) Id {
-	return Id(pkg.Name)
+	id := pkg.Name
+	if pkg.Arch != "" {
+		id += "." + pkg.Arch
+	}
+	return Id(id)
 }
 
 func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
