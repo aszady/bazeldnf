@@ -246,6 +246,7 @@ def _add_rpm_repository(config, rpm, lock_file_json, registered_rpms):
         dependencies = ["@{}{}//rpm".format(config.rpm_repository_prefix, x) for x in dependencies]
 
     rpm_name = rpm.pop("name", None)
+    _rpm_arch = rpm.pop("arch", None)  # unused for now
     if not rpm_name:
         urls = rpm.get("urls", [])
         if len(urls) < 1:
