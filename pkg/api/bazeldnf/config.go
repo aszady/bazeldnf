@@ -1,21 +1,13 @@
 package bazeldnf
 
 type RPM struct {
+	Id           string   `json:"id"`
 	Name         string   `json:"name"`
+	Arch         string   `json:"arch"`
 	Integrity    string   `json:"integrity"`
 	URLs         []string `json:"urls"`
 	Repository   string   `json:"repository"`
 	Dependencies []string `json:"dependencies"`
-}
-
-func (i *RPM) SetDependencies(pkgs []string) {
-	i.Dependencies = make([]string, 0, len(pkgs))
-	for _, pkg := range pkgs {
-		if pkg == i.Name {
-			continue
-		}
-		i.Dependencies = append(i.Dependencies, pkg)
-	}
 }
 
 type Config struct {
