@@ -31,19 +31,19 @@ func EffectiveArchitectures(architectures []string) []string {
 }
 
 func resolve(repos *bazeldnf.Repositories, required []string) ([]*api.Package, []*api.Package, error) {
-	matched, involved, err := reducer.Resolve(repos, resolvehelperopts.in, resolvehelperopts.baseSystem, EffectiveArchitectures(resolvehelperopts.arch), required, resolvehelperopts.ignoreMissing)
+	pinned, involved, err := reducer.Resolve(repos, resolvehelperopts.in, resolvehelperopts.baseSystem, EffectiveArchitectures(resolvehelperopts.arch), required, resolvehelperopts.ignoreMissing)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if len(matched) == 0 {
+	if len(pinned) == 0 {
 		return nil, nil, nil
 	}
 
 	loader := sat.NewLoader()
 
 	logrus.Info("Loading involved packages into the resolver.")
-	model, err := loader.Load(involved, matched, resolvehelperopts.forceIgnoreRegex, resolvehelperopts.onlyAllowRegex, resolvehelperopts.nobest, EffectiveArchitectures(resolvehelperopts.arch))
+	model, err := loader.Load(involved, pinned, resolvehelperopts.forceIgnoreRegex, resolvehelperopts.onlyAllowRegex, resolvehelperopts.nobest, EffectiveArchitectures(resolvehelperopts.arch))
 	if err != nil {
 		return nil, nil, err
 	}

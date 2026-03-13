@@ -42,10 +42,10 @@ func packageMatchesString(pkg *api.Package, req string) bool {
 		req == fmt.Sprintf("%s.%s-%s", pkg.Name, pkg.Arch, pkg.Version.String())
 }
 
-func (r *RepoReducer) Resolve(packages []string, ignoreMissing bool) (matched []string, involved []*api.Package, err error) {
+func (r *RepoReducer) Resolve(packages []string, ignoreMissing bool) (pinned map[api.InstallKey]*api.Package, involved []*api.Package, err error) {
+	pinned = map[api.InstallKey]*api.Package{}
 	packages = append(packages, r.implicitRequires...)
 	discovered := map[api.PackageKey]*api.Package{}
-	pinned := map[api.InstallKey]*api.Package{}
 	for _, req := range packages {
 		found := false
 		name := ""
@@ -73,10 +73,6 @@ func (r *RepoReducer) Resolve(packages []string, ignoreMissing bool) (matched []
 					discovered[p.Key()] = candidates[i]
 				}
 			}
-		}
-
-		if len(candidates) > 0 {
-			matched = append(matched, candidates[0].Name)
 		}
 	}
 
@@ -123,7 +119,7 @@ func (r *RepoReducer) Resolve(packages []string, ignoreMissing bool) (matched []
 		involved[i].Format.Provides.Entries = provides
 	}
 
-	return matched, involved, nil
+	return pinned, involved, nil
 }
 
 func (r *RepoReducer) requires(p *api.Package) (wants []*api.Package) {
@@ -160,7 +156,7 @@ func NewRepoReducer(repos *bazeldnf.Repositories, repoFiles []string, baseSystem
 	}
 }
 
-func Resolve(repos *bazeldnf.Repositories, repoFiles []string, baseSystem string, architectures []string, packages []string, ignoreMissing bool) (matched []string, involved []*api.Package, err error) {
+func Resolve(repos *bazeldnf.Repositories, repoFiles []string, baseSystem string, architectures []string, packages []string, ignoreMissing bool) (pinned map[api.InstallKey]*api.Package, involved []*api.Package, err error) {
 	repoReducer := NewRepoReducer(repos, repoFiles, baseSystem, architectures, repo.NewCacheHelper())
 	logrus.Info("Loading packages.")
 	if err := repoReducer.Load(); err != nil {
