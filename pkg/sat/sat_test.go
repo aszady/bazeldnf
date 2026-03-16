@@ -31,7 +31,9 @@ func TestRecursive(t *testing.T) {
 			}
 
 			loader := NewLoader()
-			model, err := loader.Load(packages, []string{pkg.Name}, nil, nil, false, []string{"x86_64", "noarch"})
+			pinned := map[api.BestKey]*api.Package{}
+			pinned[api.MakeBestKey(&pkg)] = &pkg
+			model, err := loader.Load(packages, pinned, nil, nil, false, []string{"x86_64", "noarch"})
 			g.Expect(err).ToNot(HaveOccurred())
 
 			_, _, _, err = Resolve(model)
