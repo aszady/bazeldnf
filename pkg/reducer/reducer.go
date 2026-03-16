@@ -92,10 +92,10 @@ func (r *RepoReducer) Resolve(packages []string, ignoreMissing bool) (matched []
 		for _, p := range current {
 			for _, newFound := range r.requires(discovered[p]) {
 				if _, exists := discovered[newFound.Key()]; !exists {
-					if _, exists := pinned[newFound.Name]; !exists {
+					if pinnedPkg, exists := pinned[newFound.Name]; !exists {
 						discovered[newFound.Key()] = newFound
 					} else {
-						logrus.Debugf("excluding %s because of pinned dependency %s", newFound.String(), pinned[newFound.Name].String())
+						logrus.Debugf("excluding %s because of pinned dependency %s", newFound.String(), pinnedPkg.String())
 					}
 				}
 			}
